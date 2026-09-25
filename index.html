@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Helen's Indicator</title>
+<meta name="description" content="Helen's Indicator: market breadth overbought/oversold gauge. A product of Grok Bot.">
+<meta name="theme-color" content="#0f1115">
+<style>
+:root{--bg:#0f1115;--card:#171a21;--line:#262b35;--txt:#e8eaee;--mut:#8b93a3;--os:#e0662c;--osf:#3a2219;--ob:#1fb58f;--obf:#15332b;--ne:#9aa1ad;--nef:#2a2e36;--grey:#2b303a}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:18px 14px 40px}
+header h1{margin:0;font-size:30px;letter-spacing:-.5px}header .by{color:var(--mut);font-style:italic;margin-top:2px}
+.stamp{margin-top:8px;color:var(--mut);font-size:13px}.stamp b{color:var(--txt)}
+.grid{display:grid;grid-template-columns:1.25fr 1fr;gap:14px;margin-top:14px}
+@media(max-width:780px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.card h2{font-size:15px;margin:0 0 8px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.6px}
+.zone{font-weight:700}.z0,.z1{color:var(--os)}.z2{color:var(--ne)}.z3,.z4{color:var(--ob)}
+.badges .row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px dashed var(--line)}
+.badges .row:last-child{border-bottom:0}.badges .l{color:var(--mut);font-size:13px}.badges .z{font-weight:700;font-size:16px}.badges .d{color:#5f6776;font-size:12px}
+.pill{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;border:2px solid}
+.p0,.p1{background:var(--osf);border-color:var(--os)}.p2{background:var(--nef);border-color:var(--ne)}.p3,.p4{background:var(--obf);border-color:var(--ob)}
+.subs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+.subs .card{text-align:center;padding:10px}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+td.v{white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:700;text-align:right}td.s{white-space:nowrap}
+.desc{color:var(--mut);font-size:12px;margin-top:2px}.grp{color:#6d7584;font-size:11px}
+.tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid}
+.ranges button{background:var(--grey);color:var(--txt);border:0;border-radius:8px;padding:5px 10px;margin-left:4px;font-size:13px;cursor:pointer}.ranges button.on{background:#4a5263}
+.legend{font-size:12px;color:var(--mut);display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}.legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:5px}
+.note{color:var(--mut);font-size:12.5px;margin-top:14px;line-height:1.5}
+a{color:#7fb3ff}
+.hdr{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
+svg text{font-family:inherit}
+@media(max-width:600px){table{font-size:13px}td.s{white-space:normal}.tag{font-size:11px}th,td{padding:8px 4px}.desc{font-size:11px}header h1{font-size:26px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Helen's Indicator</h1>
+  <div class="by">A product of Grok Bot</div>
+  <div class="stamp" id="stamp">Loading…</div>
+</header>
+<div class="grid">
+  <div class="card">
+    <h2>Composite breadth gauge</h2>
+    <svg id="gauge" viewBox="0 0 440 270" width="100%"></svg>
+    <div style="text-align:center;margin-top:-4px">Now: <span id="curzone" class="zone"></span></div>
+    <div class="subs">
+      <div class="card"><h2>Short-term</h2><svg id="gST" viewBox="0 0 440 270" width="100%"></svg><div id="stz" class="zone"></div></div>
+      <div class="card"><h2>Medium-term</h2><svg id="gMT" viewBox="0 0 440 270" width="100%"></svg><div id="mtz" class="zone"></div></div>
+    </div>
+  </div>
+  <div class="card badges"><h2>History</h2><div id="badges"></div></div>
+</div>
+<div class="card" style="margin-top:14px">
+  <h2>Components (latest close)</h2>
+  <div style="overflow-x:auto"><table><thead><tr><th>Indicator</th><th style="text-align:right">Value</th><th>Status</th></tr></thead><tbody id="comps"></tbody></table></div>
+</div>
+<div class="card" style="margin-top:14px">
+  <div class="hdr"><h2 style="margin:0">Score history</h2>
+  <div class="ranges" id="ranges"><button data-m="3">3M</button><button data-m="6">6M</button><button data-m="12" class="on">1Y</button><button data-m="0">All</button></div></div>
+  <svg id="hist" viewBox="0 0 1000 380" width="100%" style="margin-top:8px"></svg>
+  <div class="legend"><span><i style="background:#fff"></i>Composite</span><span><i style="background:#e0662c"></i>Short-term</span><span><i style="background:#4f9cf0"></i>Medium-term</span><span><i style="background:#7c8494"></i>S&amp;P 500 (right scale, dashed)</span></div>
+</div>
+<div class="note" id="note">
+  <b>Note:</b> Helen's Indicator is a replication of Helene Meisler's breadth overbought/oversold method (her published thresholds for the
+  NYSE and Nasdaq oscillators, Nasdaq Momentum, 30-day A-D, Summation "net needed", Volume Indicator and Hi-Lo Indicator) mapped onto a 0–100 scale.
+  It is <b>not</b> a number she publishes. Short-term = 10-day NYSE Oscillator + Nasdaq Momentum; Medium-term = 30-day A-D, net-needed, Volume Indicator, Hi-Lo.
+  Rows marked "context" are shown for reference and are not in the score. Zones: 0–20 Extreme Oversold · 20–40 Oversold · 40–60 Neutral · 60–80 Overbought · 80–100 Extreme Overbought.
+  Not investment advice. <span id="src"></span>
+  <br>Static charts: <a href="obos_gauge.png">gauge</a> · <a href="obos_gauge_components.png">components</a> · <a href="obos_score_history.png">history</a> · <a href="obos_dashboard.png">dashboard</a> · <a href="data.json">data.json</a>
+</div>
+</div>
+<script>
+const ZN=['Extreme Oversold','Oversold','Neutral','Overbought','Extreme Overbought'];
+const zi=s=>s==null?2:Math.min(4,Math.floor(s/20));
+const ziName=n=>Math.max(0,ZN.indexOf(n));
+const COL={os:['#e0662c','#3a2219'],ob:['#1fb58f','#15332b'],ne:['#9aa1ad','#2a2e36']};
+const zc=i=>i<2?COL.os:(i==2?COL.ne:COL.ob);
+const NS='http://www.w3.org/2000/svg';
+function el(tag,attrs,parent,text){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(text!=null)e.textContent=text;if(parent)parent.appendChild(e);return e}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function arc(cx,cy,r0,r1,a1,a2){ // degrees, 180=left, 0=right
+  const p=(r,a)=>[cx+r*Math.cos(a*Math.PI/180),cy-r*Math.sin(a*Math.PI/180)];
+  const [x1,y1]=p(r1,a1),[x2,y2]=p(r1,a2),[x3,y3]=p(r0,a2),[x4,y4]=p(r0,a1);
+  return `M${x1},${y1} A${r1},${r1} 0 0 1 ${x2},${y2} L${x3},${y3} A${r0},${r0} 0 0 0 ${x4},${y4}Z`}
+function gauge(svg,score,small){
+  svg.innerHTML='';const cx=220,cy=235,R=200,r0=124,z=zi(score);const ang=s=>180-1.8*s;
+  const lines=['EXTREME|OVERSOLD','OVERSOLD','NEUTRAL','OVERBOUGHT','EXTREME|OVERBOUGHT'];
+  for(let i=0;i<5;i++){const a1=ang(i*20),a2=ang(i*20+20),on=i==z,[ec,fc]=zc(i);
+    el('path',{d:arc(cx,cy,r0,on?R+6:R,a1-0.8,a2+0.8),fill:on?fc:'#2b303a',stroke:on?ec:'none','stroke-width':on?2.5:0},svg);
+    const m=(a1+a2)/2*Math.PI/180,rr=(R+r0)/2,x=cx+rr*Math.cos(m),y=cy-rr*Math.sin(m),rot=90-(a1+a2)/2;
+    const t=el('text',{x,y,'text-anchor':'middle','font-size':small?15:13,'font-weight':700,fill:on?'#fff':'#7c8494',transform:`rotate(${rot} ${x} ${y})`},svg);
+    const ls=lines[i].split('|');ls.forEach((s,k)=>el('tspan',{x,dy:k==0?(ls.length>1?-3:5):15},t,s));
+    if(small)t.setAttribute('display','none');}
+  for(let s=0;s<=100;s+=2.5){const a=ang(s)*Math.PI/180,rr=108;el('circle',{cx:cx+rr*Math.cos(a),cy:cy-rr*Math.sin(a),r:s%25==0?2.6:1.5,fill:'#555c69'},svg)}
+  if(!small)[0,25,50,75,100].forEach(s=>{const a=ang(s)*Math.PI/180,rr=90;el('text',{x:cx+rr*Math.cos(a),y:cy-rr*Math.sin(a)+5,'text-anchor':'middle','font-size':14,fill:'#8b93a3'},svg,s)});
+  if(score==null)return;const a=ang(score)*Math.PI/180,L=130,w=7,tx=cx+L*Math.cos(a),ty=cy-L*Math.sin(a),px=-Math.sin(a)*w,py=-Math.cos(a)*w;
+  el('polygon',{points:`${tx},${ty} ${cx+px},${cy+py} ${cx-px},${cy-py}`,fill:'#e8eaee'},svg);
+  el('circle',{cx,cy,r:44,fill:'#0f1115',stroke:'#3a404c','stroke-width':2},svg);
+  el('text',{x:cx,y:cy+(small?17:14),'text-anchor':'middle','font-size':small?50:42,'font-weight':800,fill:'#fff'},svg,Math.round(score));}
+let D=null,months=12;
+function hist(){const svg=document.getElementById('hist');svg.innerHTML='';if(!D)return;const H=D.history;let i0=0;
+  if(months){const t=new Date(D.as_of);t.setMonth(t.getMonth()-months);const ts=t.toISOString().slice(0,10);i0=H.date.findIndex(d=>d>=ts);if(i0<0)i0=0}
+  const n=H.date.length-i0,W=1000,Ht=380,l=38,r=60,t=12,b=30,pw=W-l-r,ph=Ht-t-b;const X=i=>l+(i-i0)/(Math.max(1,n-1))*pw,Y=v=>t+(1-v/100)*ph;
+  const zf=['#3a2219','#2a1d19','#1d2027','#162621','#15332b'];
+  for(let k=0;k<5;k++){el('rect',{x:l,y:Y(k*20+20),width:pw,height:ph/5,fill:zf[k]},svg);el('text',{x:l+6,y:Y(k*20+10)+4,'font-size':11,fill:'#6d7584'},svg,ZN[k])}
+  [0,20,40,60,80,100].forEach(v=>el('text',{x:l-6,y:Y(v)+4,'text-anchor':'end','font-size':11,fill:'#8b93a3'},svg,v));
+  const sp=H.spx.slice(i0).filter(v=>v!=null),smin=Math.min(...sp),smax=Math.max(...sp),SY=v=>t+(1-(v-smin)/(smax-smin||1))*ph;
+  for(let k=0;k<=4;k++){const v=smin+(smax-smin)*k/4;el('text',{x:W-r+6,y:SY(v)+4,'font-size':11,fill:'#7c8494'},svg,Math.round(v).toLocaleString())}
+  const path=(arr,f)=>{let d='',pen=false;for(let i=i0;i<H.date.length;i++){const v=arr[i];if(v==null){pen=false;continue}d+=(pen?'L':'M')+X(i).toFixed(1)+','+f(v).toFixed(1);pen=true}return d};
+  el('path',{d:path(H.spx,SY),fill:'none',stroke:'#7c8494','stroke-width':1.2,'stroke-dasharray':'5 4'},svg);
+  el('path',{d:path(H.short,Y),fill:'none',stroke:'#e0662c','stroke-width':1.2,opacity:.85},svg);
+  el('path',{d:path(H.medium,Y),fill:'none',stroke:'#4f9cf0','stroke-width':1.2,opacity:.85},svg);
+  el('path',{d:path(H.composite,Y),fill:'none',stroke:'#fff','stroke-width':2.2},svg);
+  const ticks=6;for(let k=0;k<=ticks;k++){const i=Math.round(i0+(n-1)*k/ticks),d=new Date(H.date[i]+'T12:00:00');
+    el('text',{x:X(i),y:Ht-8,'text-anchor':k==0?'start':(k==ticks?'end':'middle'),'font-size':11,fill:'#8b93a3'},svg,d.toLocaleDateString('en-US',{month:'short',year:'2-digit',...(months&&months<=6?{day:'numeric'}:{})}))}
+  const li=H.date.length-1;if(H.composite[li]!=null){el('circle',{cx:X(li),cy:Y(H.composite[li]),r:4,fill:'#fff'},svg)}}
+function render(d){D=d;
+  document.getElementById('stamp').innerHTML=`As of <b>${esc(d.as_of_label)} close</b> · last updated <b>${esc(d.generated_label)}</b>`;
+  const c=d.composite;gauge(document.getElementById('gauge'),c.score,false);
+  const cz=document.getElementById('curzone');cz.textContent=`${c.zone} (${c.score==null?'n/a':c.score.toFixed(1)})`;cz.className='zone z'+zi(c.score);
+  gauge(document.getElementById('gST'),d.short_term.score,true);gauge(document.getElementById('gMT'),d.medium_term.score,true);
+  for(const [id,o] of [['stz',d.short_term],['mtz',d.medium_term]]){const e=document.getElementById(id);e.textContent=o.zone;e.className='zone z'+zi(o.score)}
+  document.getElementById('badges').innerHTML=d.badges.map(b=>`<div class="row"><div><div class="l">${esc(b.label)}</div><div class="z">${esc(b.zone)}</div><div class="d">${b.date?new Date(b.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):''}</div></div><div class="pill p${zi(b.score)}">${b.score==null?'–':Math.round(b.score)}</div></div>`).join('');
+  document.getElementById('comps').innerHTML=d.components.map(k=>{const i=k.scored?zi(k.score):ziName(k.status),[ec,fc]=zc(i);
+    return `<tr><td>${esc(k.label)} <span class="grp">· ${esc(k.group)}</span><div class="desc">${esc(k.desc)}</div></td><td class="v">${esc(k.display)}</td><td class="s"><span class="tag" style="color:${ec};border-color:${ec};background:${fc}">${esc(k.status)}${k.scored&&k.score!=null?' · '+Math.round(k.score):''}</span>${k.scored?'':'<div class="desc">context</div>'}</td></tr>`}).join('');
+  document.getElementById('src').textContent='Data: '+d.sources+'.';hist();}
+async function load(){try{const r=await fetch('data.json?t='+Date.now(),{cache:'no-store'});if(r.ok)render(await r.json())}catch(e){console.error(e)}}
+document.getElementById('ranges').addEventListener('click',e=>{if(e.target.dataset.m==null)return;months=+e.target.dataset.m;document.querySelectorAll('#ranges button').forEach(b=>b.classList.toggle('on',b===e.target));hist()});
+load();setInterval(load,5*60*1000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
+</script>
+</body>
+</html>
