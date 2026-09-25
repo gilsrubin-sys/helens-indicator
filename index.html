@@ -38,6 +38,8 @@ a{color:#7fb3ff}
 .gate .big{font-size:34px;font-weight:800;line-height:1.05}.gate.no .big{color:#f0b93a}.gate.yes .big{color:#1fb58f}
 .gate .hd{font-weight:700;font-size:16px;margin-bottom:4px}.gate ul{margin:4px 0 0;padding-left:18px}.gate li{margin:2px 0}
 .gate .ok{color:#1fb58f;font-weight:700}.gate .miss{color:#f0b93a;font-weight:700}.gate .sm{color:var(--mut);font-size:12.5px;margin-top:6px}
+.sent{margin-top:10px;border-top:1px dashed #5a4a25;padding-top:8px;font-size:13.5px}.sent .nv{font-size:22px;font-weight:800}.sent .lab{font-weight:700}
+.gate.yes .sent{border-top-color:#2c6b58}
 .hdr{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
 svg text{font-family:inherit}
 @media(max-width:600px){table{font-size:13px}td.s{white-space:normal}.tag{font-size:11px}th,td{padding:8px 4px}.desc{font-size:11px}header h1{font-size:26px}}
@@ -51,7 +53,7 @@ svg text{font-family:inherit}
   <div class="stamp" id="stamp">Loading…</div>
 </header>
 <div class="gate no" id="gate"><div><div class="flag">Good oversold?</div><div class="big" id="gflag">…</div></div>
-  <div style="flex:1;min-width:260px"><div class="hd" id="ghead"></div><ul id="greasons"></ul><div class="sm" id="gdrop"></div><div class="sm" id="grule"></div></div></div>
+  <div style="flex:1;min-width:260px"><div class="hd" id="ghead"></div><ul id="greasons"></ul><div class="sent" id="gsent" style="display:none"></div><div class="sm" id="gdrop"></div><div class="sm" id="grule"></div></div></div>
 <div class="grid">
   <div class="card">
     <h2>Composite breadth gauge</h2>
@@ -81,7 +83,7 @@ svg text{font-family:inherit}
   Rows marked "context" are shown for reference and are not in the score. Zones: 0–20 Extreme Oversold · 20–40 Oversold · 40–60 Neutral · 60–80 Overbought · 80–100 Extreme Overbought.
   Each component's score is anchored so that <b>her own oversold level = 40</b> (the edge of the Oversold zone) and her overbought level = 60; "Extreme" is reserved for readings beyond what she called merely oversold.
   Weights: NYSE Oscillator 40%, Nasdaq Momentum 10%, 30-day A-D 14.3%, net-needed 14.3%, Volume Indicator 7.1% (formula unconfirmed, bias-adjusted), Hi-Lo NYSE 7.1%, Hi-Lo Nasdaq 7.1%.
-  <b>Good oversold</b> (her rule) = short-term AND medium-term oversold AND bearish sentiment (10-day total put/call ≥ .97, "top of the page"); a bare "Oversold" reading without it is not her buy signal.
+  <b>Good oversold</b> (her rule) = short-term AND medium-term oversold AND bearish sentiment (10-day total put/call ≥ .97, "top of the page"; or .92–.97 confirmed by the NAAIM Exposure Index in fear, ≤ 65). NAAIM feeds only this flag, never the score; a bare "Oversold" reading without it is not her buy signal.
   Updated Sep 25, 2026 after an independent review.
   Not investment advice. <span id="src"></span>
   <br>Static charts: <a href="obos_gauge.png">gauge</a> · <a href="obos_gauge_components.png">components</a> · <a href="obos_score_history.png">history</a> · <a href="obos_dashboard.png">dashboard</a> · <a href="data.json">data.json</a>
@@ -140,8 +142,17 @@ function render(d){D=d;
   for(const [id,o] of [['stz',d.short_term],['mtz',d.medium_term]]){const e=document.getElementById(id);e.textContent=o.zone;e.className='zone z'+zi(o.score)}
   document.getElementById('badges').innerHTML=d.badges.map(b=>`<div class="row"><div><div class="l">${esc(b.label)}</div><div class="z">${esc(b.zone)}</div><div class="d">${b.date?new Date(b.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):''}</div></div><div class="pill p${zi(b.score)}">${b.score==null?'–':Math.round(b.score)}</div></div>`).join('');
   const g=d.good_oversold;if(g){const box=document.getElementById('gate');box.className='gate '+(g.value?'yes':'no');
-    document.getElementById('gflag').textContent=g.flag;const g2=document.getElementById('gflag2');g2.textContent=g.flag+(g.value?'':' (complacent)'.replace(' (complacent)',g.conditions.bearish_sentiment?'':' (no bearish sentiment)'));g2.style.color=g.value?'#1fb58f':'#f0b93a';document.getElementById('ghead').textContent=g.headline;
+    document.getElementById('gflag').textContent=g.flag;const g2=document.getElementById('gflag2');g2.textContent=g.flag+(g.value?'':(g.conditions.naaim_shift&&g.conditions.short_term_oversold&&g.conditions.medium_term_oversold?' (sentiment shifting)':(g.conditions.bearish_sentiment?'':' (no bearish sentiment)')));g2.style.color=g.value?'#1fb58f':'#f0b93a';document.getElementById('ghead').textContent=g.headline;
     document.getElementById('greasons').innerHTML=g.reasons.map(r=>{const m=/: met$/.test(r);return `<li>${esc(r.replace(/: (met|missing)$/,''))}: <span class="${m?'ok':'miss'}">${m?'met':'missing'}</span></li>`}).join('');
+    const n=d.naaim,se=document.getElementById('gsent');if(n&&n.latest){const L=n.latest,fd=x=>x?new Date(x+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'n/a',sg=x=>(x>0?'+':'')+x.toFixed(2);
+      const lc=/fear/i.test(L.label)?'#1fb58f':(/margin|High/.test(L.label)?'#e0662c':(/shift/i.test(L.label)?'#f0b93a':'#9aa1ad'));
+      const hv=n.history.value.slice(-26),mn=Math.min(...hv,40),mx=Math.max(...hv,110),W=160,Hh=34,px=i=>(i*(W-4)/(hv.length-1)+2).toFixed(1),py=v=>(Hh-2-(v-mn)*(Hh-4)/(mx-mn)).toFixed(1);
+      const sp=`<svg width="${W}" height="${Hh}" style="vertical-align:middle;margin-left:8px"><line x1="0" x2="${W}" y1="${py(100)}" y2="${py(100)}" stroke="#e0662c" stroke-dasharray="3 3" stroke-width="1"/><line x1="0" x2="${W}" y1="${py(65)}" y2="${py(65)}" stroke="#1fb58f" stroke-dasharray="3 3" stroke-width="1"/><polyline fill="none" stroke="#e8eaee" stroke-width="1.5" points="${hv.map((v,i)=>px(i)+','+py(v)).join(' ')}"/></svg>`;
+      se.style.display='';se.innerHTML=`<b>Sentiment: NAAIM Exposure Index</b> <span class="nv">${L.value.toFixed(2)}</span> <span class="lab" style="color:${lc}">${esc(L.label)}</span>${L.stale?' <span class="miss">(stale, not used)</span>':''}${sp}`+
+        `<div>Survey ${fd(L.date)} (Wed close), released ${fd(L.released)} · week-over-week: ${L.wow_change!=null?sg(L.wow_change)+' (prior week '+L.prior_week_value.toFixed(2)+')':'n/a (prior week not available)'}`+
+        `${L.wow_change==null&&L.prev_value!=null?' · vs last available reading ('+fd(L.prev_date)+', '+L.prev_value.toFixed(2)+'): '+sg(L.change_vs_prev):''}`+
+        `${L.shift?' · down '+L.drop_from_recent_high.toFixed(0)+' pts from the ~4-week high ('+L.recent_high.toFixed(2)+')':''}</div>`+
+        `<div class="sm">Bands (her levels): &gt;100 on margin · 90–100 high/complacent · 65–90 neutral · ≤65 fear · &lt;50 extreme fear · drop ≥20 pts in ~4 wks = sentiment shift. Source: ${L.source=='meisler_column'?'reading quoted in Meisler\'s column':'naaim.org free table'}. ${esc(n.note)}</div>`;}
     document.getElementById('gdrop').innerHTML='<b>Drop-off math:</b> '+esc(g.dropoff.text);
     document.getElementById('grule').textContent=g.rule+' '+g.not_included;}
   document.getElementById('comps').innerHTML=d.components.map(k=>{const i=k.scored?zi(k.score):(k.tone!=null?k.tone:ziName(k.status)),[ec,fc]=zc(i);
