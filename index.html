@@ -32,6 +32,12 @@ td.v{white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:700;text-a
 .legend{font-size:12px;color:var(--mut);display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}.legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:5px}
 .note{color:var(--mut);font-size:12.5px;margin-top:14px;line-height:1.5}
 a{color:#7fb3ff}
+.gate{margin-top:14px;border-radius:14px;padding:14px 16px;border:2px solid;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.gate.no{border-color:#e0a82c;background:#2e2615}.gate.yes{border-color:#1fb58f;background:#15332b}
+.gate .flag{font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+.gate .big{font-size:34px;font-weight:800;line-height:1.05}.gate.no .big{color:#f0b93a}.gate.yes .big{color:#1fb58f}
+.gate .hd{font-weight:700;font-size:16px;margin-bottom:4px}.gate ul{margin:4px 0 0;padding-left:18px}.gate li{margin:2px 0}
+.gate .ok{color:#1fb58f;font-weight:700}.gate .miss{color:#f0b93a;font-weight:700}.gate .sm{color:var(--mut);font-size:12.5px;margin-top:6px}
 .hdr{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
 svg text{font-family:inherit}
 @media(max-width:600px){table{font-size:13px}td.s{white-space:normal}.tag{font-size:11px}th,td{padding:8px 4px}.desc{font-size:11px}header h1{font-size:26px}}
@@ -44,11 +50,13 @@ svg text{font-family:inherit}
   <div class="by">A product of Grok Bot</div>
   <div class="stamp" id="stamp">Loading…</div>
 </header>
+<div class="gate no" id="gate"><div><div class="flag">Good oversold?</div><div class="big" id="gflag">…</div></div>
+  <div style="flex:1;min-width:260px"><div class="hd" id="ghead"></div><ul id="greasons"></ul><div class="sm" id="gdrop"></div><div class="sm" id="grule"></div></div></div>
 <div class="grid">
   <div class="card">
     <h2>Composite breadth gauge</h2>
     <svg id="gauge" viewBox="0 0 440 270" width="100%"></svg>
-    <div style="text-align:center;margin-top:-4px">Now: <span id="curzone" class="zone"></span></div>
+    <div style="text-align:center;margin-top:-4px">Now: <span id="curzone" class="zone"></span> · Good oversold: <b id="gflag2"></b></div>
     <div class="subs">
       <div class="card"><h2>Short-term</h2><svg id="gST" viewBox="0 0 440 270" width="100%"></svg><div id="stz" class="zone"></div></div>
       <div class="card"><h2>Medium-term</h2><svg id="gMT" viewBox="0 0 440 270" width="100%"></svg><div id="mtz" class="zone"></div></div>
@@ -71,6 +79,10 @@ svg text{font-family:inherit}
   NYSE and Nasdaq oscillators, Nasdaq Momentum, 30-day A-D, Summation "net needed", Volume Indicator and Hi-Lo Indicator) mapped onto a 0–100 scale.
   It is <b>not</b> a number she publishes. Short-term = 10-day NYSE Oscillator + Nasdaq Momentum; Medium-term = 30-day A-D, net-needed, Volume Indicator, Hi-Lo.
   Rows marked "context" are shown for reference and are not in the score. Zones: 0–20 Extreme Oversold · 20–40 Oversold · 40–60 Neutral · 60–80 Overbought · 80–100 Extreme Overbought.
+  Each component's score is anchored so that <b>her own oversold level = 40</b> (the edge of the Oversold zone) and her overbought level = 60; "Extreme" is reserved for readings beyond what she called merely oversold.
+  Weights: NYSE Oscillator 40%, Nasdaq Momentum 10%, 30-day A-D 14.3%, net-needed 14.3%, Volume Indicator 7.1% (formula unconfirmed, bias-adjusted), Hi-Lo NYSE 7.1%, Hi-Lo Nasdaq 7.1%.
+  <b>Good oversold</b> (her rule) = short-term AND medium-term oversold AND bearish sentiment (10-day total put/call ≥ .97, "top of the page"); a bare "Oversold" reading without it is not her buy signal.
+  Updated Sep 25, 2026 after an independent review.
   Not investment advice. <span id="src"></span>
   <br>Static charts: <a href="obos_gauge.png">gauge</a> · <a href="obos_gauge_components.png">components</a> · <a href="obos_score_history.png">history</a> · <a href="obos_dashboard.png">dashboard</a> · <a href="data.json">data.json</a>
 </div>
@@ -127,8 +139,13 @@ function render(d){D=d;
   gauge(document.getElementById('gST'),d.short_term.score,true);gauge(document.getElementById('gMT'),d.medium_term.score,true);
   for(const [id,o] of [['stz',d.short_term],['mtz',d.medium_term]]){const e=document.getElementById(id);e.textContent=o.zone;e.className='zone z'+zi(o.score)}
   document.getElementById('badges').innerHTML=d.badges.map(b=>`<div class="row"><div><div class="l">${esc(b.label)}</div><div class="z">${esc(b.zone)}</div><div class="d">${b.date?new Date(b.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):''}</div></div><div class="pill p${zi(b.score)}">${b.score==null?'–':Math.round(b.score)}</div></div>`).join('');
-  document.getElementById('comps').innerHTML=d.components.map(k=>{const i=k.scored?zi(k.score):ziName(k.status),[ec,fc]=zc(i);
-    return `<tr><td>${esc(k.label)} <span class="grp">· ${esc(k.group)}</span><div class="desc">${esc(k.desc)}</div></td><td class="v">${esc(k.display)}</td><td class="s"><span class="tag" style="color:${ec};border-color:${ec};background:${fc}">${esc(k.status)}${k.scored&&k.score!=null?' · '+Math.round(k.score):''}</span>${k.scored?'':'<div class="desc">context</div>'}</td></tr>`}).join('');
+  const g=d.good_oversold;if(g){const box=document.getElementById('gate');box.className='gate '+(g.value?'yes':'no');
+    document.getElementById('gflag').textContent=g.flag;const g2=document.getElementById('gflag2');g2.textContent=g.flag+(g.value?'':' (complacent)'.replace(' (complacent)',g.conditions.bearish_sentiment?'':' (no bearish sentiment)'));g2.style.color=g.value?'#1fb58f':'#f0b93a';document.getElementById('ghead').textContent=g.headline;
+    document.getElementById('greasons').innerHTML=g.reasons.map(r=>{const m=/: met$/.test(r);return `<li>${esc(r.replace(/: (met|missing)$/,''))}: <span class="${m?'ok':'miss'}">${m?'met':'missing'}</span></li>`}).join('');
+    document.getElementById('gdrop').innerHTML='<b>Drop-off math:</b> '+esc(g.dropoff.text);
+    document.getElementById('grule').textContent=g.rule+' '+g.not_included;}
+  document.getElementById('comps').innerHTML=d.components.map(k=>{const i=k.scored?zi(k.score):(k.tone!=null?k.tone:ziName(k.status)),[ec,fc]=zc(i);
+    return `<tr><td>${esc(k.label)} <span class="grp">· ${esc(k.group)}</span><div class="desc">${esc(k.desc)}</div></td><td class="v">${esc(k.display)}</td><td class="s"><span class="tag" style="color:${ec};border-color:${ec};background:${fc}">${esc(k.status)}${k.scored&&k.score!=null?' · '+k.score.toFixed(1):''}</span>${k.scored?(k.weight!=null?'<div class="desc">weight '+k.weight+'%</div>':''):'<div class="desc">'+(k.group=='Sentiment'?'gate input':'context')+'</div>'}</td></tr>`}).join('');
   document.getElementById('src').textContent='Data: '+d.sources+'.';hist();}
 async function load(){try{const r=await fetch('data.json?t='+Date.now(),{cache:'no-store'});if(r.ok)render(await r.json())}catch(e){console.error(e)}}
 document.getElementById('ranges').addEventListener('click',e=>{if(e.target.dataset.m==null)return;months=+e.target.dataset.m;document.querySelectorAll('#ranges button').forEach(b=>b.classList.toggle('on',b===e.target));hist()});
